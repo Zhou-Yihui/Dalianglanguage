@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>雅言字符渲染器</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { background:#0b0c2a; color:#fff; font-family:"Microsoft YaHei"; text-align:center; margin:0; padding:20px; }
+  canvas { background:#111; border:1px solid #f0c000; border-radius:6px; margin-top:10px; touch-action: none; }
+  select, button, input { margin:8px; padding:8px 16px; border:none; border-radius:6px; cursor:pointer; font-size:15px; }
+  button:hover { opacity:0.9; }
+  #renderBtn { background:#f0c000; color:#000; }
+</style>
+</head>
+<body>
+<h2>🌌 雅言字符渲染器</h2>
+
+<input type="text" id="charName" placeholder="输入字符名称">
+<button id="saveBtn">保存字符</button>
+<button id="exportBtn">导出JSON</button>
+<button id="importBtn">导入JSON</button>
+<input type="file" id="importFile" accept=".json" style="display:none;">
+<br>
+<select id="charSelect"></select>
+<button id="renderBtn">渲染字符</button>
+<canvas id="canvas" width="300" height="300"></canvas>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+let allChars = JSON.parse(localStorage.getItem("stargate_chars")) || { chars: [] };
+
+// 下拉列表更新
+const charSelect = document.getElementById("charSelect");
+function updateCharSelect() {
+  charSelect.innerHTML = "";
+  allChars.chars.forEach(c => {
+    const opt = document.createElement("option");
+    opt.value = c.name;
+    opt.textContent = c.name;
+    charSelect.appendChild(opt);
+  });
+}
+updateCharSelect();
+
+// ----------------- 绘制逻辑 -----------------
+let currentStroke = [];
+let allStrokes = [];
+let drawing = false;
+
+canvas.addEventListener("mousedown", e => { drawing = true; currentStroke = []; addPoint(e); });
+canvas.addEventListener("mousemove", e => { if(drawing) addPoint(e); });
+canvas.addEventListener("mouseup", e => { if(drawing){ drawing = false; allStrokes.push(currentStroke); renderCurrent(); } });
+canvas.addEventListener("mouseleave", e => { if(drawing){ drawing = false; allStrokes.push(currentStroke); renderCurrent(); } });
+
+canvas.addEventListener("touchstart", e => { e.preventDefault(); drawing = true; currentStroke = []; addPoint(e.touches[0]); });
+canvas.addEventListener("touchmove", e => { e.preventDefault(); if(drawing) addPoint(e.touches[0]); });
+canvas.addEventListener("touchend", e => { e.preventDefault(); if(drawing){ drawing = false; allStrokes.push(currentStroke); renderCurrent(); } });
+
+function addPoint(e){
+  const rect = canvas.getBoundingClientRect();
+  currentStroke.push({x: e.clientX - rect.left, y: e.clientY - rect.top});
+  renderCurrent();
+}
+
+function renderCurrent() {
+  renderChar(allStrokes, canvas.width, canvas.height);
+}
+
+// ----------------- 渲染函数 -----------------
+function renderChar(strokes, width, height) {
+  if (!strokes || strokes.length === 0) {
+    ctx.clearRect(0, 0, width, height);
+    return;
+  }
+
+  let xs = [], ys = [];
+  strokes.forEach(stroke => stroke.forEach(p => { xs.push(p.x); ys.push(p.y); }));
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+
+  const charWidth = maxX - minX;
+  const charHeight = maxY - minY;
+  const scale = Math.min(width / charWidth, height / charHeight) * 0.8;
+  const offsetX = (width - charWidth * scale) / 2 - minX * scale;
+  const offsetY = (height - charHeight * scale) / 2 - minY * scale;
+
+  ctx.clearRect(0, 0, width, height);
+  ctx.strokeStyle = "#f0c000";
+  ctx.lineWidth = 2;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+
+  strokes.forEach(stroke => {
+    if (stroke.length === 0) return;
+    ctx.beginPath();
+    ctx.moveTo(stroke[0].x * scale + offsetX, stroke[0].y * scale + offsetY);
+    for (let i = 1; i < stroke.length; i++) {
+      const prev = stroke[i - 1];
+      const curr = stroke[i];
+      const midX = (prev.x + curr.x) / 2;
+      const midY = (prev.y + curr.y) / 2;
+      ctx.quadraticCurveTo(prev.x * scale + offsetX, prev.y * scale + offsetY, midX + offsetX, midY + offsetY);
+    }
+    ctx.stroke();
+  });
+}
+
+// ----------------- 保存字符 -----------------
+document.getElementById("saveBtn").addEventListener("click", ()=>{
+  const name = document.getElementById("charName").value.trim();
+  if(!name) return alert("请输入字符名称！");
+  if(allStrokes.length === 0) return alert("请先绘制字符！");
+  allChars.chars.push({name: name, strokes: allStrokes});
+  localStorage.setItem("stargate_chars", JSON.stringify(allChars));
+  updateCharSelect();
+  allStrokes = [];
+  currentStroke = [];
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  alert("字符已保存！");
+});
+
+// ----------------- 导出JSON -----------------
+document.getElementById("exportBtn").addEventListener("click", ()=>{
+  if(!allChars.chars || allChars.chars.length === 0){
+    return alert("没有字符可导出！");
+  }
+  const dataStr = JSON.stringify(allChars, null, 2);
+  const blob = new Blob([dataStr], {type: "application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "stargate_chars.json";
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+// ----------------- 导入JSON -----------------
+document.getElementById("importBtn").addEventListener("click", ()=>{
+  document.getElementById("importFile").click();
+});
+
+document.getElementById("importFile").addEventListener("change", (event)=>{
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const imported = JSON.parse(e.target.result);
+      if(!imported.chars) throw "格式不正确";
+      allChars = imported;
+      localStorage.setItem("stargate_chars", JSON.stringify(allChars));
+      updateCharSelect();
+      alert("导入成功！");
+    } catch(err) {
+      alert("导入失败: "+err);
+    }
+  };
+  reader.readAsText(file);
+});
+
+// ----------------- 渲染按钮 -----------------
+document.getElementById("renderBtn").addEventListener("click", () => {
+  const selectedName = charSelect.value;
+  const charObj = allChars.chars.find(c => c.name === selectedName);
+  if (!charObj) return alert("字符不存在！");
+  allStrokes = charObj.strokes;
+  renderCurrent();
+});
+</script>
+</body>
+</html>
