@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>星门字符造字系统</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { margin:0; padding:20px; background:#0b0c2a; color:#fff; font-family:"Microsoft YaHei"; text-align:center; }
+  canvas { background:#111; border:1px solid #f0c000; border-radius:6px; margin-top:10px; }
+  button { margin:6px; padding:8px 16px; border:none; border-radius:6px; cursor:pointer; font-size:15px; }
+  #saveBtn { background:#f0c000; color:#000; }
+  #clearBtn { background:#444; color:#fff; }
+  #exportBtn { background:#007bff; color:#fff; }
+  .char-item { border:1px solid #f0c000; margin:10px; padding:10px; border-radius:6px; }
+</style>
+</head>
+<body>
+
+<h2>🌌 星门字符造字系统</h2>
+<canvas id="canvas" width="300" height="300"></canvas><br>
+<button id="clearBtn" onclick="clearCanvas()">清空画布</button>
+<button id="saveBtn" onclick="saveChar()">保存字符</button>
+<button id="exportBtn" onclick="exportChars()">导出 JSON</button>
+
+<h3>已保存字符</h3>
+<div id="chars"></div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let drawing = false, strokes = [], currentCharStrokes = [];
+let allChars = JSON.parse(localStorage.getItem("stargate_chars")) || { chars: [] };
+
+// 获取触摸或鼠标位置
+function getPos(e){
+    const rect = canvas.getBoundingClientRect();
+    return e.touches ? 
+        {x:e.touches[0].clientX-rect.left, y:e.touches[0].clientY-rect.top} :
+        {x:e.clientX-rect.left, y:e.clientY-rect.top};
+}
+
+// 绘制所有笔画，平滑处理
+function drawCurrent(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.strokeStyle="#f0c000"; ctx.lineWidth=3; ctx.lineJoin="round"; ctx.lineCap="round";
+    for(const stroke of [...currentCharStrokes, strokes]){
+        if(stroke.length<1) continue;
+        ctx.beginPath();
+        ctx.moveTo(stroke[0].x, stroke[0].y);
+        for(let i=1;i<stroke.length;i++){
+            const prev=stroke[i-1], curr=stroke[i];
+            const midX=(prev.x+curr.x)/2, midY=(prev.y+curr.y)/2;
+            ctx.quadraticCurveTo(prev.x, prev.y, midX, midY);
+        }
+        ctx.stroke();
+    }
+}
+
+// 事件绑定
+canvas.addEventListener('mousedown',e=>{drawing=true; strokes=[getPos(e)]; drawCurrent();});
+canvas.addEventListener('mousemove',e=>{if(!drawing) return; strokes.push(getPos(e)); drawCurrent();});
+canvas.addEventListener('mouseup',()=>{drawing=false; if(strokes.length>0){currentCharStrokes.push(strokes); strokes=[];} drawCurrent();});
+
+canvas.addEventListener('touchstart',e=>{e.preventDefault(); drawing=true; strokes=[getPos(e)]; drawCurrent();});
+canvas.addEventListener('touchmove',e=>{e.preventDefault(); if(!drawing) return; strokes.push(getPos(e)); drawCurrent();});
+canvas.addEventListener('touchend',()=>{drawing=false; if(strokes.length>0){currentCharStrokes.push(strokes); strokes=[];} drawCurrent();});
+
+// 清空画布
+function clearCanvas(){ ctx.clearRect(0,0,canvas.width,canvas.height); strokes=[]; currentCharStrokes=[]; }
+
+// 保存字符
+function saveChar(){
+    if(currentCharStrokes.length===0) return alert("请先绘制一个字符！");
+    const name = prompt("请输入字符名称", "char_"+Date.now());
+    if(!name) return;
+    allChars.chars.push({name, strokes:currentCharStrokes});
+    localStorage.setItem("stargate_chars", JSON.stringify(allChars));
+    updateList();
+    currentCharStrokes=[];
+    clearCanvas();
+}
+
+// 更新列表
+function updateList(){
+    const list = document.getElementById("chars");
+    list.innerHTML="";
+    allChars.chars.forEach(c=>{
+        const div=document.createElement("div");
+        div.className="char-item";
+        div.textContent="✨ "+c.name;
+        list.appendChild(div);
+    });
+}
+
+// 导出 JSON，用于 Android assets
+function exportChars(){
+    const jsonStr = JSON.stringify(allChars,null,2);
+    const blob = new Blob([jsonStr],{type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href=url; a.download="stargate_chars.json"; a.click();
+    URL.revokeObjectURL(url);
+    alert("已导出 stargate_chars.json，可以放到 Android assets 使用！");
+}
+
+updateList();
+</script>
+</body>
+</html>
