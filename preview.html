@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>星门输入法预览</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { background:#0b0c2a; color:#fff; text-align:center; font-family:"Microsoft YaHei"; margin:0; padding:20px; }
+  #keyboard{display:flex;flex-wrap:wrap;justify-content:center;margin-top:20px;}
+  .char-btn{background:#f0c000;color:#000;border:none;border-radius:8px;padding:12px;margin:6px;font-size:18px;cursor:pointer;}
+  #inputBox{margin-top:20px;padding:10px;width:90%;font-size:16px;border-radius:8px;border:none;}
+</style>
+</head>
+<body>
+<h2>🌠 星门语言输入法预览</h2>
+<p>点击下方字符以插入输入框</p>
+<input type="text" id="inputBox" placeholder="在这里试输入..." />
+<div id="keyboard"></div>
+<script src="render.js"></script>
+<script>
+window.addEventListener("DOMContentLoaded",()=>{
+    const data = JSON.parse(localStorage.getItem("stargate_chars")||'{"chars":[]}');
+    const keyboard = document.getElementById("keyboard");
+    const inputBox = document.getElementById("inputBox");
+    data.chars.forEach(c=>{
+        const btn=document.createElement("button");
+        btn.textContent=c.name;
+        btn.className="char-btn";
+        btn.onclick=()=>inputBox.value+=c.name;
+        keyboard.appendChild(btn);
+    });
+});
+</script>
+</body>
+</html>
