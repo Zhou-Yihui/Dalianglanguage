@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>星门输入法完整预览</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { background:#0b0c2a; color:#fff; font-family:"Microsoft YaHei"; text-align:center; margin:0; padding:20px; }
+  h2 { margin-bottom:10px; }
+  #inputBox { margin-top:10px; padding:10px; width:90%; font-size:16px; border-radius:8px; border:none; }
+  #keyboard { display:flex; flex-wrap:wrap; justify-content:center; margin-top:20px; }
+  .char-container { margin:6px; display:flex; flex-direction:column; align-items:center; }
+  canvas { background:#111; border:1px solid #f0c000; border-radius:6px; }
+  .latin-name { margin-top:4px; font-size:14px; color:#f0c000; }
+  #backBtn, #delBtn { margin-top:20px; padding:8px 14px; background:#007bff; color:#fff; border:none; border-radius:6px; cursor:pointer; margin-right:10px; }
+  #backBtn:hover, #delBtn:hover { opacity:0.9; }
+</style>
+</head>
+<body>
+<h2>🌠 星门语言输入法完整预览</h2>
+<p>输入拉丁拼音，显示对应字符</p>
+<input type="text" id="inputBox" placeholder="在这里输入拼音..." />
+<div>
+  <button id="delBtn">删除最后一个字母</button>
+  <button id="backBtn" onclick="window.location.href='render.html'">返回造字页面</button>
+</div>
+<div id="keyboard"></div>
+
+<script>
+// 获取 localStorage 数据
+let allChars = JSON.parse(localStorage.getItem("stargate_chars")) || { chars: [] };
+
+const inputBox = document.getElementById("inputBox");
+const keyboardDiv = document.getElementById("keyboard");
+const delBtn = document.getElementById("delBtn");
+
+// 渲染单个字符到 canvas
+function renderChar(strokes, width=80, height=80) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+
+  if (!strokes || strokes.length === 0) return canvas;
+
+  let xs=[], ys=[];
+  strokes.forEach(stroke => stroke.forEach(p => { xs.push(p.x); ys.push(p.y); }));
+  const minX=Math.min(...xs), maxX=Math.max(...xs);
+  const minY=Math.min(...ys), maxY=Math.max(...ys);
+  const charWidth = maxX - minX, charHeight = maxY - minY;
+  const scale = Math.min(width/charWidth, height/charHeight)*0.8;
+  const offsetX = (width - charWidth*scale)/2 - minX*scale;
+  const offsetY = (height - charHeight*scale)/2 - minY*scale;
+
+  ctx.clearRect(0,0,width,height);
+  ctx.strokeStyle = "#f0c000";
+  ctx.lineWidth = 2;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+
+  strokes.forEach(stroke => {
+    if (stroke.length === 0) return;
+    ctx.beginPath();
+    ctx.moveTo(stroke[0].x*scale+offsetX, stroke[0].y*scale+offsetY);
+    for (let i=1;i<stroke.length;i++){
+      const prev = stroke[i-1], curr = stroke[i];
+      const midX=(prev.x+curr.x)/2, midY=(prev.y+curr.y)/2;
+      ctx.quadraticCurveTo(prev.x*scale+offsetX, prev.y*scale+offsetY, midX*scale+offsetX, midY*scale+offsetY);
+    }
+    ctx.stroke();
+  });
+  return canvas;
+}
+
+// 根据输入拼音筛选字符
+function updateKeyboard() {
+  const query = inputBox.value.trim().toLowerCase();
+  keyboardDiv.innerHTML = '';
+
+  if (!query) return;
+
+  const matched = allChars.chars.filter(c => c.name.toLowerCase().startsWith(query));
+
+  matched.forEach(c => {
+    const container = document.createElement('div');
+    container.className = 'char-container';
+    const canvas = renderChar(c.strokes, 80, 80);
+    container.appendChild(canvas);
+
+    const latinName = document.createElement('div');
+    latinName.className = 'latin-name';
+    latinName.textContent = c.name; // 完整拉丁拼音
+    container.appendChild(latinName);
+
+    keyboardDiv.appendChild(container);
+  });
+}
+
+// 输入事件
+inputBox.addEventListener('input', updateKeyboard);
+
+// 删除最后一个字符
+delBtn.addEventListener('click', () => {
+  inputBox.value = inputBox.value.slice(0,-1);
+  updateKeyboard();
+});
+
+// 页面初始化显示空
+updateKeyboard();
+</script>
+</body>
+</html>
