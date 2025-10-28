@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>星门输入法预览</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { background:#0b0c2a; color:#fff; text-align:center; font-family:"Microsoft YaHei"; margin:0; padding:20px; }
+  h2 { margin-bottom:10px; }
+  #keyboard { display:flex; flex-wrap:wrap; justify-content:center; margin-top:20px; }
+  .char-btn { background:#f0c000; color:#000; border:none; border-radius:8px;
+    padding:12px; margin:4px; font-size:18px; min-width:40px; cursor:pointer;
+    box-shadow:0 0 6px #f0c00066; transition:transform 0.1s ease; }
+  .char-btn:hover { transform:scale(1.05); }
+  #inputBox { margin-top:20px; padding:10px; width:90%; font-size:16px; border-radius:8px; border:none; }
+  #backBtn { margin-top:20px; padding:8px 14px; background:#007bff; color:#fff; border:none; border-radius:6px; }
+</style>
+</head>
+<body>
+  <h2>🌠 星门语言输入法预览</h2>
+  <input type="text" id="inputBox" placeholder="输入拉丁音名查看对应字符..." />
+  <canvas id="displayCanvas" width="300" height="300" style="margin-top:10px; border:1px solid #f0c000; border-radius:6px;"></canvas>
+  <div id="keyboard"></div>
+  <button id="backBtn" onclick="window.location.href='auto-save-draw.html'">返回造字页面</button>
+
+<script src="render.js"></script>
+<script>
+const inputBox = document.getElementById("inputBox");
+const displayCanvas = document.getElementById("displayCanvas");
+const ctx = displayCanvas.getContext("2d");
+let allChars = JSON.parse(localStorage.getItem("stargate_chars")) || { chars: [] };
+
+// 生成键盘
+const keyboardDiv = document.getElementById("keyboard");
+const letters = 'abcdefghijklmnopqrstuvwxyz'.split('');
+let uppercase = false;
+
+function renderKeyboard() {
+  keyboardDiv.innerHTML = '';
+  letters.forEach(l=>{
+    const btn = document.createElement("button");
+    btn.className="char-btn";
+    btn.textContent = uppercase ? l.toUpperCase() : l;
+    btn.onclick = () => {
+      inputBox.value += btn.textContent.toLowerCase();
+      inputBox.dispatchEvent(new Event('input'));
+    };
+    keyboardDiv.appendChild(btn);
+  });
+  // 大小写切换键
+  const shiftBtn = document.createElement("button");
+  shiftBtn.className="char-btn";
+  shiftBtn.textContent="Shift";
+  shiftBtn.onclick = () => { uppercase=!uppercase; renderKeyboard(); };
+  keyboardDiv.appendChild(shiftBtn);
+  // 删除键
+  const delBtn = document.createElement("button");
+  delBtn.className="char-btn";
+  delBtn.textContent="Del";
+  delBtn.onclick = () => { inputBox.value = inputBox.value.slice(0,-1); inputBox.dispatchEvent(new Event('input')); };
+  keyboardDiv.appendChild(delBtn);
+}
+renderKeyboard();
+
+// 输入监听
+inputBox.addEventListener("input",()=>{
+  const value = inputBox.value.trim().toLowerCase();
+  if(!value){ctx.clearRect(0,0,displayCanvas.width,displayCanvas.height); return;}
+  const matched = allChars.chars.filter(c=>c.name.toLowerCase().startsWith(value));
+  if(matched.length>0){
+    renderChar(matched[0].strokes, ctx, displayCanvas.width, displayCanvas.height);
+  } else {
+    ctx.clearRect(0,0,displayCanvas.width,displayCanvas.height);
+  }
+});
+</script>
+</body>
+</html>
