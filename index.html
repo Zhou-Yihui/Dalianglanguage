@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>星门输入法预览</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { background:#0b0c2a; color:#fff; text-align:center; font-family:"Microsoft YaHei"; margin:0; padding:20px; }
+  #inputBox { margin-top:20px; padding:10px; width:90%; font-size:16px; border-radius:8px; border:none; }
+  #candidates { display:flex; flex-wrap:wrap; justify-content:center; margin-top:20px; }
+  .charCanvas { margin:6px; border:1px solid #f0c000; border-radius:6px; width:60px; height:60px; }
+  #keyboard { margin-top:20px; display:flex; flex-wrap:wrap; justify-content:center; }
+  .keyBtn { background:#f0c000; color:#000; border:none; border-radius:8px; padding:12px; margin:6px; font-size:18px; min-width:40px; cursor:pointer; }
+  .keyBtn:hover { transform:scale(1.05); transition:0.1s; }
+</style>
+</head>
+<body>
+<h2>🌠 星门语言输入法预览</h2>
+<input type="text" id="inputBox" placeholder="在这里输入拉丁字母...">
+<div id="candidates"></div>
+<div id="keyboard"></div>
+<button onclick="window.location.href='auto-save-draw.html'">返回造字页面</button>
+
+<script src="render.js"></script>
+<script>
+const inputBox = document.getElementById('inputBox');
+const candidatesDiv = document.getElementById('candidates');
+const keyboardDiv = document.getElementById('keyboard');
+
+const data = JSON.parse(localStorage.getItem('stargate_chars')) || { chars: [] };
+const latinKeys = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+latinKeys.forEach(k => {
+  const btn = document.createElement('button');
+  btn.textContent = k;
+  btn.className = 'keyBtn';
+  btn.onclick = () => { inputBox.value += k; updateCandidates(); };
+  keyboardDiv.appendChild(btn);
+});
+
+// 更新候选字符
+function updateCandidates() {
+  candidatesDiv.innerHTML = '';
+  const val = inputBox.value.toUpperCase();
+  if (!val) return;
+  const matches = data.chars.filter(c => c.name.toUpperCase().startsWith(val));
+  matches.forEach(c => {
+    const canv = document.createElement('canvas');
+    canv.width = 60; canv.height = 60;
+    canv.className = 'charCanvas';
+    renderChar(c.strokes, 60, 60, canv);
+    candidatesDiv.appendChild(canv);
+  });
+}
+
+inputBox.addEventListener('input', updateCandidates);
+</script>
+</body>
+</html>
