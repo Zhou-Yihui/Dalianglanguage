@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>雅言字符造字</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { background:#0b0c2a; color:#fff; font-family:"Microsoft YaHei"; text-align:center; margin:0; padding:20px; }
+  canvas { background:#111; border:1px solid #f0c000; border-radius:6px; margin-top:10px; }
+  select, button { margin:8px; padding:8px 16px; border:none; border-radius:6px; cursor:pointer; font-size:15px; }
+  button:hover { opacity:0.9; }
+  #renderBtn { background:#f0c000; color:#000; }
+</style>
+</head>
+<body>
+<h2>🌌 雅言字符造字</h2>
+<select id="charSelect"></select>
+<input type="text" id="charName" placeholder="输入字符名称（拉丁音名等）">
+<button id="addBtn">添加新字符</button>
+<button id="renderBtn">渲染字符</button>
+<canvas id="canvas" width="300" height="300"></canvas>
+<br>
+<input type="file" id="importFile">
+<button id="exportBtn">导出到本地</button>
+<button id="uploadBtn">上传到 GitHub</button>
+
+<script>
+// ===== 初始化数据，保留已有数据 =====
+let allChars = JSON.parse(localStorage.getItem("stargate_chars"));
+if(!allChars) allChars = { chars: [] };
+
+// ===== 渲染器 =====
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+function renderChar(strokes, width, height){
+  if(!strokes || strokes.length===0){
+    ctx.clearRect(0,0,width,height);
+    return;
+  }
+  let xs=[], ys=[];
+  strokes.forEach(stroke=>stroke.forEach(p=>{ xs.push(p.x); ys.push(p.y); }));
+  const minX=Math.min(...xs), maxX=Math.max(...xs);
+  const minY=Math.min(...ys), maxY=Math.max(...ys);
+  const charWidth=maxX-minX, charHeight=maxY-minY;
+  const scale=Math.min(width/charWidth, height/charHeight)*0.8;
+  const offsetX=(width-charWidth*scale)/2-minX*scale;
+  const offsetY=(height-charHeight*scale)/2-minY*scale;
+  ctx.clearRect(0,0,width,height);
+  ctx.strokeStyle="#f0c000";
+  ctx.lineWidth=2;
+  ctx.lineJoin="round";
+  ctx.lineCap="round";
+  strokes.forEach(stroke=>{
+    if(stroke.length===0) return;
+    ctx.beginPath();
+    ctx.moveTo(stroke[0].x*scale+offsetX, stroke[0].y*scale+offsetY);
+    for(let i=1;i<stroke.length;i++){
+      const prev=stroke[i-1], curr=stroke[i];
+      const midX=(prev.x+curr.x)/2, midY=(prev.y+curr.y)/2;
+      ctx.quadraticCurveTo(prev.x*scale+offsetX, prev.y*scale+offsetY, midX*scale+offsetX, midY*scale+offsetY);
+    }
+    ctx.stroke();
+  });
+}
+
+// ===== 下拉更新 =====
+const charSelect=document.getElementById("charSelect");
+function updateCharSelect(){
+  charSelect.innerHTML="";
+  allChars.chars.forEach(c=>{
+    const opt=document.createElement("option");
+    opt.value=c.name;
+    opt.textContent=c.name;
+    charSelect.appendChild(opt);
+  });
+}
+updateCharSelect();
+
+// ===== 点击渲染 =====
+document.getElementById("renderBtn").addEventListener("click",()=>{
+  const selectedName=charSelect.value;
+  const charObj=allChars.chars.find(c=>c.name===selectedName);
+  if(!charObj) return alert("字符不存在！");
+  renderChar(charObj.strokes, canvas.width, canvas.height);
+});
+
+// ===== 添加新字符 =====
+document.getElementById("addBtn").addEventListener("click",()=>{
+  const name=document.getElementById("charName").value.trim();
+  if(!name) return alert("请输入字符名称！");
+  const existing=allChars.chars.find(c=>c.name===name);
+  if(existing) return alert("名称已存在！");
+  // 示例：空笔画数组，之后可以绘制
+  const newChar={ name: name, strokes: [] };
+  allChars.chars.push(newChar);
+  localStorage.setItem("stargate_chars", JSON.stringify(allChars));
+  updateCharSelect();
+  alert("✅ 新字符添加成功！");
+});
+
+// ===== 导入 JSON =====
+document.getElementById("importFile").addEventListener("change", function(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(evt){
+    const imported = JSON.parse(evt.target.result);
+    allChars.chars = [...allChars.chars, ...imported.chars];
+    localStorage.setItem("stargate_chars", JSON.stringify(allChars));
+    updateCharSelect();
+    alert("✅ 导入成功！");
+  }
+  reader.readAsText(file);
+});
+
+// ===== 导出到本地 =====
+document.getElementById("exportBtn").addEventListener("click", function(){
+  const jsonData = JSON.stringify(allChars, null, 2);
+  const blob = new Blob([jsonData], {type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download="stargate_chars.json";
+  a.click();
+});
+
+// ===== 上传到 GitHub =====
+document.getElementById("uploadBtn").addEventListener("click", async function(){
+  const jsonData = JSON.stringify(allChars, null, 2);
+  const fileName = "stargate_chars.json";
+  const repoOwner = 'zhou-yihui';
+  const repoName = 'Dalianglanguage';
+  const uploadPath = 'data/' + fileName;
+  try{
+    // 通过 Android 注入或 Node 环境获取 token
+    const githubToken = window.AndroidToken?.getToken?.() || "";
+    if(!githubToken) return alert("❌ 未提供 GitHub Token！");
+    const checkResp = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/contents/${uploadPath}`, {
+      headers: { Authorization: `token ${githubToken}` }
+    });
+    let sha = null;
+    if(checkResp.ok){
+      const existing = await checkResp.json();
+      sha = existing.sha;
+    }
+    const uploadResp = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/contents/${uploadPath}`, {
+      method:'PUT',
+      headers:{
+        Authorization:`token ${githubToken}`,
+        'Content-Type':'application/json'
+      },
+      body: JSON.stringify({
+        message:'Auto upload from Daliang IME system',
+        content: btoa(unescape(encodeURIComponent(jsonData))),
+        sha: sha || undefined
+      })
+    });
+    if(uploadResp.ok) alert("✅ 上传成功！");
+    else alert("⚠️ 上传失败：" + uploadResp.status);
+  }catch(err){
+    console.error(err);
+    alert("❌ 出错：" + err.message);
+  }
+});
+</script>
+</body>
+</html>
