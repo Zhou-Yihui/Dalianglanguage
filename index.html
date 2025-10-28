@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>雅言输入法预览</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { background:#0b0c2a; color:#fff; text-align:center; font-family:"Microsoft YaHei"; margin:0; padding:20px; }
+    h2 { margin-bottom:10px; }
+    #keyboard { display:flex; flex-wrap:wrap; justify-content:center; margin-top:20px; }
+    .key-btn {
+      background:#f0c000; color:#000; border:none; border-radius:8px;
+      padding:12px; margin:4px; font-size:18px; min-width:40px; cursor:pointer;
+      box-shadow:0 0 8px #f0c00066; transition:transform 0.1s ease;
+    }
+    .key-btn:hover { transform:scale(1.05); }
+    #inputBox { margin-top:20px; padding:10px; width:90%; font-size:16px; border-radius:8px; border:none; }
+    #backBtn { margin-top:20px; padding:8px 14px; background:#007bff; color:#fff; border:none; border-radius:6px; cursor:pointer; }
+  </style>
+</head>
+<body>
+  <h2>🌠 雅言语言输入法预览（拉丁键盘）</h2>
+  <input type="text" id="inputBox" placeholder="在这里试输入..." />
+  <div id="keyboard"></div>
+  <button id="backBtn" onclick="window.location.href='auto-save-draw.html'">返回造字页面</button>
+
+  <script>
+    window.addEventListener("DOMContentLoaded", () => {
+      // 从 localStorage 获取造字数据
+      const data = localStorage.getItem("stargate_chars");
+      if (!data) {
+        alert("未检测到字符数据，请先造字！");
+        return;
+      }
+      const parsed = JSON.parse(data);
+
+      // 生成拉丁字母 -> 字符映射
+      // 假设每个字符对象有 property latinKeys 表示触发它的拉丁键（数组或字符串）
+      const latinMapping = {};
+      parsed.chars.forEach(c => {
+        if(c.latinKeys){
+          c.latinKeys.forEach(l => latinMapping[l.toLowerCase()] = c.name);
+        } else {
+          // 如果没有 latinKeys，可默认用 name 的首字母
+          latinMapping[c.name[0].toLowerCase()] = c.name;
+        }
+      });
+
+      const keyboardDiv = document.getElementById("keyboard");
+      const inputBox = document.getElementById("inputBox");
+
+      // 定义标准 QWERTY 键盘行
+      const rows = [
+        ['q','w','e','r','t','y','u','i','o','p'],
+        ['a','s','d','f','g','h','j','k','l'],
+        ['z','x','c','v','b','n','m']
+      ];
+
+      // 生成键盘按钮
+      rows.forEach(row => {
+        row.forEach(key => {
+          const btn = document.createElement("button");
+          btn.className = "key-btn";
+          btn.textContent = key;
+          btn.addEventListener("click", () => {
+            if(latinMapping[key]){
+              inputBox.value += latinMapping[key];
+            } else {
+              inputBox.value += key; // 如果没有对应字符，则输入字母本身
+            }
+          });
+          keyboardDiv.appendChild(btn);
+        });
+        const br = document.createElement("br");
+        keyboardDiv.appendChild(br);
+      });
+
+      // 支持键盘事件
+      document.addEventListener("keydown", (e) => {
+        const key = e.key.toLowerCase();
+        if(latinMapping[key]){
+          inputBox.value += latinMapping[key];
+          e.preventDefault();
+        }
+      });
+    });
+  </script>
+</body>
+</html>
