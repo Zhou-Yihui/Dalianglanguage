@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>星门字符造字</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { background:#0b0c2a; color:#fff; font-family:"Microsoft YaHei"; text-align:center; margin:0; padding:20px; }
+  canvas { background:#111; border:1px solid #f0c000; border-radius:6px; margin-top:10px; touch-action:none; }
+  input, button { margin:8px; padding:8px 16px; border:none; border-radius:6px; font-size:15px; cursor:pointer; }
+  button:hover { opacity:0.9; }
+  #renderBtn { background:#f0c000; color:#000; }
+</style>
+</head>
+<body>
+  <h2>🌌 星门字符造字</h2>
+  <input type="text" id="charName" placeholder="输入字符名称(拉丁音名)" />
+  <button id="saveCharBtn">保存字符</button>
+  <button id="exportBtn">导出 JSON</button>
+  <button id="importBtn">导入 JSON</button>
+  <br>
+  <canvas id="drawCanvas" width="300" height="300"></canvas>
+  <canvas id="previewCanvas" width="300" height="300"></canvas>
+
+<script src="render.js"></script>
+<script>
+// 数据初始化
+let allChars = JSON.parse(localStorage.getItem("stargate_chars")) || { chars: [] };
+
+// 手写绘制
+const drawCanvas = document.getElementById("drawCanvas");
+const ctx = drawCanvas.getContext("2d");
+let drawing = false, currentStroke = [];
+let strokes = [];
+
+function redraw() {
+  ctx.clearRect(0,0,drawCanvas.width,drawCanvas.height);
+  ctx.strokeStyle = "#f0c000"; ctx.lineWidth = 2; ctx.lineJoin="round"; ctx.lineCap="round";
+  strokes.forEach(stroke=>{
+    if(stroke.length===0) return;
+    ctx.beginPath();
+    ctx.moveTo(stroke[0].x, stroke[0].y);
+    for(let i=1;i<stroke.length;i++){
+      const prev = stroke[i-1]; const curr = stroke[i];
+      const midX = (prev.x+curr.x)/2; const midY = (prev.y+curr.y)/2;
+      ctx.quadraticCurveTo(prev.x, prev.y, midX, midY);
+    }
+    ctx.stroke();
+  });
+}
+
+// 绘制事件
+drawCanvas.addEventListener("pointerdown", e => { drawing=true; currentStroke=[{x:e.offsetX,y:e.offsetY}]; });
+drawCanvas.addEventListener("pointermove", e => { if(!drawing) return; currentStroke.push({x:e.offsetX,y:e.offsetY}); redraw(); });
+drawCanvas.addEventListener("pointerup", e => { if(!drawing) return; drawing=false; strokes.push(currentStroke); currentStroke=[]; redraw(); });
+drawCanvas.addEventListener("pointerleave", e => { if(drawing){drawing=false; strokes.push(currentStroke); currentStroke=[]; redraw();} });
+
+// 保存字符
+document.getElementById("saveCharBtn").addEventListener("click",()=>{
+  const name = document.getElementById("charName").value.trim();
+  if(!name){alert("请填写字符名称！"); return;}
+  const existing = allChars.chars.find(c=>c.name===name);
+  if(existing){existing.strokes=strokes;} else {allChars.chars.push({name:name,strokes:strokes});}
+  localStorage.setItem("stargate_chars", JSON.stringify(allChars));
+  alert("✅ 字符保存成功！");
+  renderCharPreview(name);
+});
+
+// 渲染预览
+function renderCharPreview(name){
+  const charObj = allChars.chars.find(c=>c.name===name);
+  if(charObj && typeof renderChar==="function"){renderChar(charObj.strokes, document.getElementById("previewCanvas").getContext("2d"), 300, 300);}
+}
+</script>
+<script>
+// 导入/导出 JSON
+document.getElementById("exportBtn").addEventListener("click",()=>{
+  const blob = new Blob([JSON.stringify(allChars, null, 2)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="stargate_chars.json"; a.click();
+});
+
+document.getElementById("importBtn").addEventListener("click",()=>{
+  const input = document.createElement("input"); input.type="file"; input.accept=".json";
+  input.onchange=e=>{
+    const file=e.target.files[0]; const reader=new FileReader();
+    reader.onload=ev=>{
+      try{
+        allChars = JSON.parse(ev.target.result);
+        localStorage.setItem("stargate_chars", JSON.stringify(allChars));
+        alert("✅ 导入成功！");
+      }catch(err){alert("❌ JSON解析失败："+err.message);}
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+});
+</script>
+</body>
+</html>
