@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>雅言输入法预览</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body { background:#0b0c2a; color:#fff; text-align:center; font-family:"Microsoft YaHei"; margin:0; padding:20px; }
+h2 { margin-bottom:10px; }
+#keyboard { display:flex; flex-wrap:wrap; justify-content:center; margin-top:20px; }
+.key-btn {
+  background:#f0c000; color:#000; border:none; border-radius:8px;
+  padding:12px; margin:4px; font-size:18px; min-width:40px; cursor:pointer;
+  box-shadow:0 0 8px #f0c00066; transition:transform 0.1s ease;
+}
+.key-btn:hover { transform:scale(1.05); }
+#canvasContainer { display:flex; flex-wrap:wrap; justify-content:center; margin-top:20px; }
+.char-canvas { margin:4px; border:1px solid #f0c000; border-radius:6px; }
+#backBtn, #delBtn { margin-top:20px; padding:8px 14px; border:none; border-radius:6px; cursor:pointer; }
+#backBtn { background:#007bff; color:#fff; margin-right:10px; }
+#delBtn { background:#ff4d4d; color:#fff; }
+</style>
+</head>
+<body>
+<h2>🌠 雅言语言输入法预览（拉丁键盘触发字符渲染）</h2>
+<div id="keyboard"></div>
+<div>
+  <button id="backBtn" onclick="window.location.href='auto-save-draw.html'">返回造字页面</button>
+  <button id="delBtn">删除</button>
+</div>
+<div id="canvasContainer"></div>
+
+<script>
+const canvasWidth = 60;
+const canvasHeight = 60;
+
+// 渲染函数（直接使用你之前的 renderChar）
+function renderChar(strokes, width, height, ctx) {
+  if (!strokes || strokes.length === 0) {
+    ctx.clearRect(0, 0, width, height);
+    return;
+  }
+  let xs = [], ys = [];
+  strokes.forEach(stroke => stroke.forEach(p => { xs.push(p.x); ys.push(p.y); }));
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const charWidth = maxX - minX;
+  const charHeight = maxY - minY;
+  const scale = Math.min(width / charWidth, height / charHeight) * 0.8;
+  const offsetX = (width - charWidth * scale) / 2 - minX * scale;
+  const offsetY = (height - charHeight * scale) / 2 - minY * scale;
+
+  ctx.clearRect(0, 0, width, height);
+  ctx.strokeStyle = "#f0c000";
+  ctx.lineWidth = 2;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+
+  strokes.forEach(stroke => {
+    if (stroke.length === 0) return;
+    ctx.beginPath();
+    ctx.moveTo(stroke[0].x * scale + offsetX, stroke[0].y * scale + offsetY);
+    for (let i = 1; i < stroke.length; i++) {
+      const prev = stroke[i - 1];
+      const curr = stroke[i];
+      const midX = (prev.x + curr.x) / 2;
+      const midY = (prev.y + curr.y) / 2;
+      ctx.quadraticCurveTo(prev.x * scale + offsetX, prev.y * scale + offsetY, midX * scale + offsetX, midY * scale + offsetY);
+    }
+    ctx.stroke();
+  });
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+  const data = localStorage.getItem("stargate_chars");
+  if (!data) { alert("未检测到字符数据，请先造字！"); return; }
+  const parsed = JSON.parse(data);
+
+  // 生成拉丁字母 -> 字符映射
+  const latinMapping = {};
+  parsed.chars.forEach(c => {
+    if(c.latinKeys){
+      c.latinKeys.forEach(l => latinMapping[l.toLowerCase()] = c);
+    } else {
+      latinMapping[c.name[0].toLowerCase()] = c;
+    }
+  });
+
+  const keyboardDiv = document.getElementById("keyboard");
+  const canvasContainer = document.getElementById("canvasContainer");
+
+  // QWERTY 键盘行
+  const rows = [
+    ['q','w','e','r','t','y','u','i','o','p'],
+    ['a','s','d','f','g','h','j','k','l'],
+    ['z','x','c','v','b','n','m']
+  ];
+
+  // 生成键盘按钮
+  rows.forEach(row => {
+    row.forEach(key => {
+      const btn = document.createElement("button");
+      btn.className = "key-btn";
+      btn.textContent = key;
+      btn.addEventListener("click", () => insertChar(key));
+      keyboardDiv.appendChild(btn);
+    });
+    keyboardDiv.appendChild(document.createElement("br"));
+  });
+
+  // 插入字符渲染
+  function insertChar(key) {
+    const lowerKey = key.toLowerCase();
+    const charObj = latinMapping[lowerKey];
+    if(!charObj) return;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+    canvas.className = "char-canvas";
+    const ctx = canvas.getContext("2d");
+    renderChar(charObj.strokes, canvasWidth, canvasHeight, ctx);
+    canvasContainer.appendChild(canvas);
+  }
+
+  // 删除最后一个字符
+  document.getElementById("delBtn").addEventListener("click", () => {
+    const last = canvasContainer.lastChild;
+    if(last) canvasContainer.removeChild(last);
+  });
+
+  // 键盘事件
+  document.addEventListener("keydown", (e) => {
+    const key = e.key.toLowerCase();
+    if(latinMapping[key]){
+      insertChar(key);
+      e.preventDefault();
+    } else if(e.key === "Backspace"){
+      const last = canvasContainer.lastChild;
+      if(last) canvasContainer.removeChild(last);
+      e.preventDefault();
+    }
+  });
+});
+</script>
+</body>
+</html>
