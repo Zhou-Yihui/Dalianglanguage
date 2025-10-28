@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>大凉国大凉语系雅言语言文字输入法</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { background:#0b0c2a; color:#fff; font-family:"Microsoft YaHei",sans-serif; text-align:center; margin:0; padding:20px;}
+  h2 { color:#f0c000; margin-bottom:10px;}
+  #inputBox { width:90%; max-width:600px; height:60px; font-size:20px; border-radius:8px; border:none; padding:10px; text-align:center;}
+  #keyboard { display:grid; grid-template-columns:repeat(10,1fr); gap:6px; justify-content:center; max-width:600px; margin:20px auto;}
+  .key { background:#222; color:#f0c000; border:none; border-radius:8px; padding:14px 0; font-size:18px; cursor:pointer; }
+  .key:hover { background:#444; }
+  .wide { grid-column:span 2; }
+  #canvas { background:#111; border:1px solid #f0c000; border-radius:8px; margin-top:15px; }
+</style>
+</head>
+<body>
+  <h2>🌌 大凉国大凉语系雅言语言文字输入法</h2>
+  <input id="inputBox" placeholder="输入拉丁字母…" readonly>
+  <div id="keyboard"></div>
+  <canvas id="canvas" width="300" height="300"></canvas>
+
+<script src="render.js"></script>
+<script>
+const keyboard = document.getElementById("keyboard");
+const inputBox = document.getElementById("inputBox");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+let isUpper = false;
+const layout = "qwertyuiopasdfghjklzxcvbnm".split('');
+function renderKeyboard() {
+  keyboard.innerHTML = "";
+  layout.forEach(ch => {
+    const btn = document.createElement("button");
+    btn.textContent = isUpper ? ch.toUpperCase() : ch;
+    btn.className = "key";
+    btn.onclick = () => handleKey(ch);
+    keyboard.appendChild(btn);
+  });
+  const shift = document.createElement("button");
+  shift.textContent = "⇧";
+  shift.className = "key wide";
+  shift.onclick = () => { isUpper = !isUpper; renderKeyboard(); };
+  keyboard.appendChild(shift);
+
+  const del = document.createElement("button");
+  del.textContent = "⌫";
+  del.className = "key wide";
+  del.onclick = () => {
+    inputBox.value = inputBox.value.slice(0, -1);
+    showChar(inputBox.value);
+  };
+  keyboard.appendChild(del);
+}
+renderKeyboard();
+
+// 模拟字符库
+let allChars = JSON.parse(localStorage.getItem("stargate_chars")) || {chars:[]};
+
+function handleKey(ch) {
+  inputBox.value += isUpper ? ch.toUpperCase() : ch;
+  showChar(inputBox.value);
+}
+
+function showChar(prefix) {
+  const found = allChars.chars.filter(c => c.name.startsWith(prefix.toLowerCase()));
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (found.length > 0) {
+    renderChar(found[0].strokes, canvas.width, canvas.height, ctx);
+  }
+}
+</script>
+</body>
+</html>
